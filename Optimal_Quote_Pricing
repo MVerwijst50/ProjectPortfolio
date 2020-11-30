@@ -1,0 +1,378 @@
+library(WriteXLS)
+library(splitstackshape)
+library(dplyr)
+library(ggplot2)
+library(mltools)
+library(DMwR)
+library(caret)
+library(xlsx)
+library(openxlsx)
+library(readxl)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(cowplot)
+
+
+###Update Label for File Naming
+Branch <- "1"
+NbrBins <- 10
+
+Today <- Sys.Date()
+Label <- paste("Branch",Branch,"_",Today, sep="")
+
+###Get Data into R and create variable 'mydata'
+ImportFile <-  paste(".../Quote Pricing_", Label,".xlsx", sep="")
+Quote_Pricing_Data <-read_excel(ImportFile, sheet="Data")
+mydata <- Quote_Pricing_Data
+round(mydata$CWT.CRU.Ratio, digits=6)
+#View(mydata)
+
+mydata1 <- mydata
+mydata1 <- split(mydata1, mydata1$TonGroup)
+#View(mydata1[[1]])
+
+#Cutoff top and bottom 5% of historic CCR values to eliminate outliers
+cutoff_low <- list()
+cutoff_high <- list()
+
+for(i in 1:length(mydata1)){
+  cutoff_low[[i]] <- quantile(mydata1[[i]]$CWT.CRU.Ratio, 0.05)
+  cutoff_high[[i]] <- quantile(mydata1[[i]]$CWT.CRU.Ratio, 0.95)
+  
+  mydata1[[i]] <- mydata1[[i]][mydata1[[i]]$CWT.CRU.Ratio < cutoff_high[[i]], ]
+  mydata1[[i]] <- mydata1[[i]][mydata1[[i]]$CWT.CRU.Ratio > cutoff_low[[i]], ]                             
+}  
+
+
+#Define Bin Min, Max, and Mean
+BinsMean_List <- list()
+BinsMax_List <- list()
+BinsMin_List <- list()
+
+aMin <- 0
+bMin <- 0
+cMin <- 0
+dMin <- 0
+eMin <- 0
+fMin <- 0
+gMin <- 0
+hMin <- 0
+iMin <- 0
+jMin <- 0
+
+aMax <- 0
+bMax <- 0
+cMax <- 0
+dMax <- 0
+eMax <- 0
+fMax <- 0
+gMax <- 0
+hMax <- 0
+iMax <- 0
+jMax <- 0
+
+aMean <- 0
+bMean <- 0
+cMean <- 0
+dMean <- 0
+eMean <- 0
+fMean <- 0
+gMean <- 0
+hMean <- 0
+iMean <- 0
+jMean <- 0
+
+for(i in 1:length(mydata1)){
+  binsMean <- tapply(mydata1[[i]]$CWT.CRU.Ratio, cut_number(mydata1[[i]]$CWT.CRU.Ratio, NbrBins),mean)
+  bins <- binsMean
+  binsMin <- tapply(mydata1[[i]]$CWT.CRU.Ratio, cut_number(mydata1[[i]]$CWT.CRU.Ratio, NbrBins),min)
+  binsMax <- tapply(mydata1[[i]]$CWT.CRU.Ratio, cut_number(mydata1[[i]]$CWT.CRU.Ratio, NbrBins),max)
+  binsMean <- as.vector(binsMean)
+  binsMin <- as.vector(binsMin)
+  binsMax <- as.vector(binsMax)
+  print(names(mydata1)[[i]])
+  print(binsMean)
+  print(binsMin)
+  print(binsMax)
+  BinsMean_List[[i]] <- binsMean
+  BinsMin_List[[i]] <- binsMin
+  BinsMax_List[[i]] <- binsMax
+  names(BinsMean_List)[[i]] <- names(mydata1)[[i]]
+  names(BinsMin_List)[[i]] <- names(mydata1)[[i]]
+  names(BinsMax_List)[[i]] <- names(mydata1)[[i]]
+  
+  aMax[[i]] <- round(binsMax[1], digits = 4)
+  bMax[[i]] <- round(binsMax[2], digits = 4)
+  cMax[[i]] <- round(binsMax[3], digits = 4)
+  dMax[[i]] <- round(binsMax[4], digits = 4)
+  eMax[[i]] <- round(binsMax[5], digits = 4)
+  fMax[[i]] <- round(binsMax[6], digits = 4)
+  gMax[[i]] <- round(binsMax[7], digits = 4)
+  hMax[[i]] <- round(binsMax[8], digits = 4)
+  iMax[[i]] <- round(binsMax[9], digits = 4)
+  jMax[[i]] <- round(binsMax[10], digits = 4)
+  
+  aMin[[i]] <- round(binsMin[1], digits = 4)
+  bMin[[i]] <- round(binsMin[2], digits = 4)
+  cMin[[i]] <- round(binsMin[3], digits = 4)
+  dMin[[i]] <- round(binsMin[4], digits = 4)
+  eMin[[i]] <- round(binsMin[5], digits = 4)
+  fMin[[i]] <- round(binsMin[6], digits = 4)
+  gMin[[i]] <- round(binsMin[7], digits = 4)
+  hMin[[i]] <- round(binsMin[8], digits = 4)
+  iMin[[i]] <- round(binsMin[9], digits = 4)
+  jMin[[i]] <- round(binsMin[10], digits = 4)
+  
+  aMean[[i]] <- round(binsMean[1], digits = 4)
+  bMean[[i]] <- round(binsMean[2], digits = 4)
+  cMean[[i]] <- round(binsMean[3], digits = 4)
+  dMean[[i]] <- round(binsMean[4], digits = 4)
+  eMean[[i]] <- round(binsMean[5], digits = 4)
+  fMean[[i]] <- round(binsMean[6], digits = 4)
+  gMean[[i]] <- round(binsMean[7], digits = 4)
+  hMean[[i]] <- round(binsMean[8], digits = 4)
+  iMean[[i]] <- round(binsMean[9], digits = 4)
+  jMean[[i]] <- round(binsMean[10], digits = 4)
+}
+
+BinsMean_List
+BinsMin_List
+BinsMax_List
+
+mydata2 <- mydata1
+
+for(i in 1:length(mydata2)){
+  #Create NewRatioGroups Column - ADJUST IF Statement depending on # of Bins
+  mydata2[[i]] <- within(mydata2[[i]], NewRatioGroups <- 
+                  ifelse(Quote_Won==0, 
+                      ifelse(CWT.CRU.Ratio<bMin[[i]], capture.output(cat(bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')), 
+                      ifelse(CWT.CRU.Ratio<cMin[[i]], capture.output(cat(cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')), 
+                      ifelse(CWT.CRU.Ratio<dMin[[i]], capture.output(cat(dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')), 
+                      ifelse(CWT.CRU.Ratio<eMin[[i]], capture.output(cat(eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')), 
+                      ifelse(CWT.CRU.Ratio<fMin[[i]], capture.output(cat(fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<gMin[[i]], capture.output(cat(gMean[[i]],hMean[[i]],iMean[[i]],jMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<hMin[[i]], capture.output(cat(hMean[[i]],iMean[[i]],jMean[[i]],sep=',')),       
+                      ifelse(CWT.CRU.Ratio<iMin[[i]], capture.output(cat(iMean[[i]],jMean[[i]],sep=',')),        
+                      ifelse(CWT.CRU.Ratio<jMin[[i]], capture.output(cat(jMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio>=jMin[[i]], ""
+                          ,"")))))))))),
+                  ifelse(Quote_Won==1, 
+                      ifelse(CWT.CRU.Ratio<bMin[[i]], "",
+                      ifelse(CWT.CRU.Ratio<cMin[[i]], capture.output(cat(aMean[[i]],sep=',')),    
+                      ifelse(CWT.CRU.Ratio<dMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<eMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<fMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<gMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio<hMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],sep=',')),     
+                      ifelse(CWT.CRU.Ratio<iMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],sep=',')),       
+                      ifelse(CWT.CRU.Ratio<jMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],sep=',')),
+                      ifelse(CWT.CRU.Ratio>=jMin[[i]], capture.output(cat(aMean[[i]],bMean[[i]],cMean[[i]],dMean[[i]],eMean[[i]],fMean[[i]],gMean[[i]],hMean[[i]],iMean[[i]],sep=','))
+                          ,"")))))))))),"")) )
+}
+
+for(i in 1:length(mydata2)){
+  #Copy original CWT:CRU Ratio to the NewRatioGroup Columns
+  mydata2[[i]]$Ratio_Expanded <- paste(mydata2[[i]]$CWT.CRU.Ratio, mydata2[[i]]$NewRatioGroups, sep=",")
+  gsub("\\,$", "",mydata2[[i]]$Ratio_Expanded)
+  
+  #Create Mirrored Records using the csplit function on NewRatioGroups 
+  mydata2[[i]] <- cSplit(mydata2[[i]], "Ratio_Expanded", ",", direction="long")
+  
+  #Create new RatioGroup_Expanded record
+  mydata2[[i]] <- within(mydata2[[i]], RatioGroup_Expanded <- 
+                           ifelse(Ratio_Expanded<bMin[[i]], capture.output(cat('a)',aMin[[i]],'-',aMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<cMin[[i]], capture.output(cat('b)',bMin[[i]],'-',bMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<dMin[[i]], capture.output(cat('c)',cMin[[i]],'-',cMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<eMin[[i]], capture.output(cat('d)',dMin[[i]],'-',dMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<fMin[[i]], capture.output(cat('e)',eMin[[i]],'-',eMax[[i]],sep=' ')),
+                           ifelse(Ratio_Expanded<gMin[[i]], capture.output(cat('f)',fMin[[i]],'-',fMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<hMin[[i]], capture.output(cat('g)',gMin[[i]],'-',gMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<iMin[[i]], capture.output(cat('h)',hMin[[i]],'-',hMax[[i]],sep=' ')), 
+                           ifelse(Ratio_Expanded<jMin[[i]], capture.output(cat('i)',iMin[[i]],'-',iMax[[i]],sep=' ')),
+                           ifelse(Ratio_Expanded>=jMin[[i]], capture.output(cat('j)',jMin[[i]],'-',jMax[[i]],sep=' '))
+                               ,"")))))))))))
+  
+  mydata2[[i]] <- within(mydata2[[i]], RatioGroup_Min <- 
+                           ifelse(Ratio_Expanded<bMin[[i]], aMin[[i]], 
+                           ifelse(Ratio_Expanded<cMin[[i]], bMin[[i]], 
+                           ifelse(Ratio_Expanded<dMin[[i]], cMin[[i]], 
+                           ifelse(Ratio_Expanded<eMin[[i]], dMin[[i]], 
+                           ifelse(Ratio_Expanded<fMin[[i]], eMin[[i]], 
+                           ifelse(Ratio_Expanded<gMin[[i]], fMin[[i]], 
+                           ifelse(Ratio_Expanded<hMin[[i]], gMin[[i]], 
+                           ifelse(Ratio_Expanded<iMin[[i]], hMin[[i]], 
+                           ifelse(Ratio_Expanded<jMin[[i]], iMin[[i]], 
+                           ifelse(Ratio_Expanded>=jMin[[i]], jMin[[i]]
+                               ,"")))))))))))
+  
+  mydata2[[i]] <- within(mydata2[[i]], RatioGroup_Max <- 
+                           ifelse(Ratio_Expanded<bMin[[i]], aMax[[i]], 
+                           ifelse(Ratio_Expanded<cMin[[i]], bMax[[i]], 
+                           ifelse(Ratio_Expanded<dMin[[i]], cMax[[i]], 
+                           ifelse(Ratio_Expanded<eMin[[i]], dMax[[i]], 
+                           ifelse(Ratio_Expanded<fMin[[i]], eMax[[i]], 
+                           ifelse(Ratio_Expanded<gMin[[i]], fMax[[i]], 
+                           ifelse(Ratio_Expanded<hMin[[i]], gMax[[i]], 
+                           ifelse(Ratio_Expanded<iMin[[i]], hMax[[i]], 
+                           ifelse(Ratio_Expanded<jMin[[i]], iMax[[i]], 
+                           ifelse(Ratio_Expanded>=jMin[[i]], jMax[[i]]
+                               ,"")))))))))))
+  
+  mydata2[[i]] <- within(mydata2[[i]], RatioGroup_Mean <- 
+                           ifelse(Ratio_Expanded<bMin[[i]], aMean[[i]], 
+                           ifelse(Ratio_Expanded<cMin[[i]], bMean[[i]], 
+                           ifelse(Ratio_Expanded<dMin[[i]], cMean[[i]], 
+                           ifelse(Ratio_Expanded<eMin[[i]], dMean[[i]], 
+                           ifelse(Ratio_Expanded<fMin[[i]], eMean[[i]], 
+                           ifelse(Ratio_Expanded<gMin[[i]], fMean[[i]], 
+                           ifelse(Ratio_Expanded<hMin[[i]], gMean[[i]], 
+                           ifelse(Ratio_Expanded<iMin[[i]], hMean[[i]], 
+                           ifelse(Ratio_Expanded<jMin[[i]], iMean[[i]],
+                           ifelse(Ratio_Expanded>=jMin[[i]], jMean[[i]]
+                               ,"")))))))))))
+}
+
+#View(mydata2[[1]])
+#View(mydata2[[2]])
+#summary(mydata2[[1]])
+
+mydata3 <- list()
+formula <- list()
+model <- list()
+
+str(head(mydata2[[1]]))
+summary(mydata2[[1]])
+
+for(i in 1:length(mydata2)){
+  
+  #Logistic Regression model using the below variables 
+  formula[[i]] <- mydata2[[i]]$Quote_Won ~ 
+    mydata2[[i]]$Cust_WinRatio + mydata2[[i]]$Ratio_Expanded +
+    mydata2[[i]]$`Wgt_0-100` + mydata2[[i]]$`Wgt_100-500` +
+    mydata2[[i]]$`Wgt_500-1000` + mydata2[[i]]$`Wgt_1k-5k` +
+    mydata2[[i]]$`Wgt_5k-10k` + mydata2[[i]]$`Wgt_10k-40k` +
+    mydata2[[i]]$`Wgt_40k+` + mydata2[[i]]$`Cut?` + mydata2[[i]]$`Contract?`
+  
+  model[[i]] <- glm(formula = formula[[i]],
+                    data=mydata2[[i]], family=binomial)#, control = list(maxit = 1000))
+  
+  #Verify the coefficients are statistically relevant 
+  print(summary(model[[i]]))
+  #print(fitted(model[[i]]))
+  
+  #Add the Win_Probability (fitted model) to the original data set
+  mydata2[[i]] <- cbind(mydata2[[i]], Win_Probability = fitted(model[[i]]))
+  round(mydata2[[i]]$Win_Probability, digits=4)
+  
+  #Subset data to Write to CSV
+  mydata3[[i]] <- mydata2[[i]][,c("TonGroup","QuoteDet","QuoteDate","Quote_Won","WgtGroup",
+                                  "RatioGroup_Expanded","Win_Probability",
+                                  "RatioGroup_Min","RatioGroup_Max","RatioGroup_Mean" )]
+}
+
+
+predicted.data <- data.frame(probability.of.win=model[[1]]$fitted.values, 
+                             ActualWin=mydata3[[1]]$Quote_Won)
+predicted.data <- predicted.data[order(
+  predicted.data$probability.of.win, decreasing=FALSE),]
+predicted.data$rank <- 1:nrow(predicted.data)
+
+ggplot(data= predicted.data, aes(x=rank, y=probability.of.win)) +
+  geom_point(aes(color=ActualWin), alpha=1, shape=4, stroke=2) +
+  xlab("Index") + ylab("Predicted Probability of Winning Quote")
+
+#View(mydata3[[1]]) 
+#View(mydata3[[2]]) 
+
+names(mydata3) <- names(mydata1)
+Branch <- Branch
+TonGrp <- list()
+Label <- list()
+Write_To <- list()
+
+for(i in 1:length(mydata3)){
+  TonGrp[[i]] <- names(mydata3[i])
+  Label[[i]] <- paste("Branch",Branch,"_Ton",TonGrp[[i]], sep="")
+  #print(Label[[i]])
+  Write_To[[i]] <- paste("C:/Users/mverwijst/Documents/00. HPE Documents/Mirrored_Data/", Label[[i]], "_Mirrored_Predictions.csv", sep="")
+  #print(Write_To[[i]])
+  write.csv(mydata3[[i]], Write_To[[i]])
+}
+
+mydata4 <- mydata3
+groupColumns = c("WgtGroup","RatioGroup_Expanded")
+dataColumns_Count = c("QuoteDet")
+dataColumns_Sum = c("Quote_Won", "Win_Probability")
+dataColumns_Avg = c("RatioGroup_Min", "RatioGroup_Max", "RatioGroup_Mean")
+myTable_Count <- list()
+myTable_Sum <- list()
+myTable_Means <- list()
+keeps <- 1
+myTable <- list()
+
+for(i in 1:length(mydata4)){
+  myTable_Count[[i]] <- count(mydata4[[i]], vars=groupColumns)
+  myTable_Sum[[i]] <- ddply(mydata4[[i]], groupColumns, function(x) colSums(x[dataColumns_Sum]))
+  myTable_Means[[i]] <- ddply(mydata4[[i]], groupColumns, function(x) x[which.min(x$RatioGroup_Min),])
+  keeps <- c("WgtGroup","RatioGroup_Expanded", "RatioGroup_Min", "RatioGroup_Max", "RatioGroup_Mean")
+  myTable_Means[[i]] <- myTable_Means[[i]][keeps]
+  
+  #round(myTable_Sum[[i]]$Win_Probability, digits = 2)
+  #round(as.numeric(myTable_Means[[i]]$RatioGroup_Min), digits = 4)
+  #round(as.numeric(myTable_Means[[i]]$RatioGroup_Max), digits = 4)
+  #round(as.numeric(myTable_Means[[i]]$RatioGroup_Mean), digits = 4)
+  
+  myTable[[i]] <- merge(myTable_Count[[i]],myTable_Sum[[i]])
+  myTable[[i]] <- merge(myTable[[i]],myTable_Means[[i]])
+  
+  myTable[[i]]$AvgWinProb <- (myTable[[i]]$Win_Probability / myTable[[i]]$freq)
+  #round(myTable[[i]]$AvgWinProb, digits = 4)
+}
+
+#View(myTable[[1]])
+#View(myTable[[2]])
+
+Export <- list()
+
+for(i in 1:length(myTable)){
+  Export[[i]] <- myTable[[i]]
+  Export[[i]]$Company <- "14757"
+  Export[[i]]$Key1 <- Branch
+  Export[[i]]$Key2 <- TonGrp[[i]]
+  Export[[i]]$Key5 <- ""
+  
+  colnames(Export[[i]])[1] <- "Key3"
+  colnames(Export[[i]])[2] <- "Key4"
+  colnames(Export[[i]])[6] <- "Number01"
+  colnames(Export[[i]])[7] <- "Number02"
+  colnames(Export[[i]])[8] <- "Number03"
+  colnames(Export[[i]])[9] <- "Number04"
+  
+  keeps <- c("Company", "Key1","Key2", "Key3", "Key4", "Key5", "Number01", "Number02", "Number03", "Number04")
+  Export[[i]] <- Export[[i]][keeps]
+}
+
+#View(Export[[1]])
+#View(Export[[2]])
+
+FullExport <- do.call("rbind", Export)
+
+sapply(FullExport, class)
+cols.num <- c("Number01","Number02","Number03")
+FullExport[cols.num] <- sapply(FullExport[cols.num],as.numeric)
+sapply(FullExport, class)
+
+round(FullExport$Number01, digits = 4)
+round(FullExport$Number02, digits = 4)
+round(FullExport$Number03, digits = 4)
+round(FullExport$Number04, digits = 4)
+
+#View(FullExport)
+
+###Define File Paths
+Export_Path <- paste(".../Branch_", Branch, "_Import_", Today,".xlsx", sep="")
+write.xlsx(FullExport, file=Export_Path, row.names=FALSE, col.names=TRUE,
+           sheetName="DMT_Import")
+
+str(head(FullExport))
