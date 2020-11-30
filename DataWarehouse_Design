@@ -1,0 +1,443 @@
+## Database and Data Warehouse design to answer the following Inventory Questions:
+# 1. What is the Total Inventory Value at all Branches?
+# 2. How much Raw Material is currently on Order from each Vendor?
+# 3. How much Inventory is currently available for a specific Customer?
+
+## Create Tables (12 Total with Normalization Changes)
+
+CREATE TABLE ADDRESSES (
+AddressID INT NOT NULL PRIMARY KEY,
+StreetAddress VARCHAR (50) NOT NULL,
+City VARCHAR (20) NOT NULL,
+"State" VARCHAR (10) NOT NULL,
+Zip INT NOT NULL );
+
+CREATE TABLE CONTACT_INFO (
+ContactID INT NOT NULL PRIMARY KEY,
+FirstName VARCHAR (20) NOT NULL,
+LastName VARCHAR (20) NOT NULL,
+Phone VARCHAR (12) NOT NULL,
+Email VARCHAR (20) NOT NULL );
+
+CREATE TABLE VENDOR (
+VendNbr INT NOT NULL PRIMARY KEY,
+VendName VARCHAR (30) NOT NULL,
+"Status" VARCHAR (10) NOT NULL,
+ContactID INT FOREIGN KEY REFERENCES CONTACT_INFO(ContactID) NOT NULL,
+AddressID INT FOREIGN KEY REFERENCES ADDRESSES(AddressID) NOT NULL );
+
+CREATE TABLE CUSTOMER (
+CustNbr INT NOT NULL PRIMARY KEY,
+CustName VARCHAR (30) NOT NULL,
+"Type" VARCHAR (10) NOT NULL,
+ContactID INT FOREIGN KEY REFERENCES CONTACT_INFO(ContactID) NOT NULL,
+AddressID INT FOREIGN KEY REFERENCES ADDRESSES(AddressID) NOT NULL );
+
+CREATE TABLE RAW_MATERIAL (
+RawID INT NOT NULL PRIMARY KEY,
+VendNbr INT FOREIGN KEY REFERENCES VENDOR(VendNbr) NOT NULL,
+MaterialName VARCHAR (20) NOT NULL,
+MaterialCost DECIMAL NOT NULL );
+
+CREATE TABLE MANUFACTURE_PROCESS (
+ManufactureID INT NOT NULL PRIMARY KEY,
+RawID INT FOREIGN KEY REFERENCES RAW_MATERIAL(RawID) NOT NULL,
+Machine VARCHAR (10) NOT NULL,
+Process VARCHAR (30) NOT NULL,
+ManufactureCost DECIMAL NOT NULL );
+
+CREATE TABLE PRODUCT (
+ProdNbr INT NOT NULL PRIMARY KEY,
+ProdDesc VARCHAR (50) NOT NULL,
+RawID INT FOREIGN KEY REFERENCES RAW_MATERIAL(RawID) NOT NULL,
+ManufactureID INT FOREIGN KEY REFERENCES MANUFACTURE_PROCESS(ManufactureID) NOT NULL );
+
+CREATE TABLE EMPLOYEE (
+EmployeeID INT NOT NULL PRIMARY KEY,
+EmpFirstName VARCHAR (20) NOT NULL,
+EmpLastName VARCHAR (20) NOT NULL,
+BranchNbr INT NOT NULL );
+
+CREATE TABLE BRANCH_LOCATION (
+BranchNbr INT NOT NULL PRIMARY KEY,
+BranchName VARCHAR (10) NOT NULL,
+BranchGM_EmployeeID INT FOREIGN KEY REFERENCES EMPLOYEE(EmployeeID) NOT NULL );
+
+CREATE TABLE BRANCH_INVENTORY (
+InventoryID INT NOT NULL PRIMARY KEY,
+BranchNbr INT FOREIGN KEY REFERENCES BRANCH_LOCATION(BranchNbr) NOT NULL,
+ProdNbr INT FOREIGN KEY REFERENCES PRODUCT(ProdNbr) NOT NULL,
+QtyAvailable DECIMAL NOT NULL,
+QtyReserved DECIMAL NOT NULL,
+QtyOnOrder DECIMAL NOT NULL );
+
+CREATE TABLE [TRANSFER] (
+TransferID INT NOT NULL PRIMARY KEY,
+FromBranch INT FOREIGN KEY REFERENCES BRANCH_LOCATION(BranchNbr) NOT NULL,
+ToBranch INT FOREIGN KEY REFERENCES BRANCH_LOCATION(BranchNbr) NOT NULL,
+ProdNbr INT FOREIGN KEY REFERENCES PRODUCT(ProdNbr) NOT NULL,
+QtyTransferred DECIMAL NOT NULL );
+
+CREATE TABLE SPECIAL_INVENTORY (
+SpecialInvID INT NOT NULL PRIMARY KEY,
+CustNbr INT FOREIGN KEY REFERENCES CUSTOMER(CustNbr),
+ProdNbr INT FOREIGN KEY REFERENCES PRODUCT(ProdNbr) );
+
+
+## Load Tables with Data
+
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('1', '11 Branch', 'Romeoville', 'Illinois', '60446') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('2', '12 Branch', 'Fond du Lac', 'Wisconsin', '54937') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip) 
+VALUES ('3', '13 Branch', 'St Paul', 'Minnesota', '55121') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('4', '24 Customer', 'Lake Ville', 'Illinois', '60046') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('5', '25 Customer', 'Grayslake', 'Illinois', '60047') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip) 
+VALUES ('6', '26 Customer', 'Burlington', 'Wisconsin', '51805') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('7', '37 Vendor', 'Chicago', 'Illinois', '60606') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip)
+VALUES ('8', '38 Vendor', 'Proctor', 'Minnesota', '55810') ;
+INSERT INTO dbo.ADDRESSES (AddressID, StreetAddress, City, [State], Zip) 
+VALUES ('9', '39 Vendor', 'Milwaukee', 'Illinois', '51810') ;
+
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('1', 'Betty', 'Crocker', '555-111-1111', 'bcrocker@email.com') ;
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('2', 'Abe', 'Lincoln', '555-111-2222', 'alincoln@email.com') ;
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('3', 'Mike', 'Jordan', '555-111-3333', 'mjordan@email.com') ;
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('4', 'Frank', 'Sinatra', '555-111-4444', 'fsinatra@email.com') ;
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('5', 'Aaron', 'Rodgers', '555-111-5555', 'arodgers@email.com') ;
+INSERT INTO dbo.CONTACT_INFO (ContactID, FirstName, LastName, Phone, Email)
+VALUES ('6', 'Fred', 'Flinstone', '555-111-6666', 'fflinstone@email.com') ;   
+
+INSERT INTO dbo.VENDOR (VendNbr, VendName, "Status", ContactID, AddressID)
+VALUES ('1', 'Big Steel Inc', 'Active', '4', '7') ;
+INSERT INTO dbo.VENDOR (VendNbr, VendName, "Status", ContactID, AddressID)
+VALUES ('2', 'New Age Metals', 'Active', '5', '8') ;
+INSERT INTO dbo.VENDOR (VendNbr, VendName, "Status", ContactID, AddressID)
+VALUES ('3', 'Old World Pipe', 'Not Active', '6', '9') ;
+
+INSERT INTO dbo.CUSTOMER (CustNbr, CustName, "Type", ContactID, AddressID)
+VALUES ('1', 'Big Rig Digs', 'Customer', '1', '4') ;
+INSERT INTO dbo.CUSTOMER (CustNbr, CustName, "Type", ContactID, AddressID)
+VALUES ('2', 'Valves and Fittings', 'Customer', '2', '5') ;
+INSERT INTO dbo.CUSTOMER (CustNbr, CustName, "Type", ContactID, AddressID)
+VALUES ('3', 'Roller Coasters of America', 'Prospect', '3', '6') ;
+
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('1', '1', 'Structural Tubing', '100.00') ;
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('2', '1', 'Hot Rolled Coil', '80.50') ;
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('3', '2', 'Stainless & Aluminum', '160.25') ;
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('4', '2', 'Boiler Tubes', '145.00') ;
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('5', '3', 'Big Pipe', '80.00') ;
+INSERT INTO dbo.RAW_MATERIAL(RawID, VendNbr, MaterialName, MaterialCost)
+VALUES ('6', '3', 'Little Pipe', '40.00') ;
+
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('1', '1', 'Laser', 'Cut into 5 foot pieces', '20') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('2', '2', 'Laser', 'Cut 5x5 foot squares', '30') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('3', '3', 'Bender', 'Bend at 90 degree angle', '10') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('4', '4', 'Laser', 'Cut into 10 foot pieces', '20') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('5', '5', 'Laser', 'Cut into 8 foot pieces', '15') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('6', '5', 'Bender', 'Bend at 45 degree angle', '10') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('7', '6', 'Laser', 'Cut into 2 foot pieces', '10') ;
+INSERT INTO dbo.MANUFACTURE_PROCESS(ManufactureID, RawID, Machine, Process, ManufactureCost)
+VALUES ('8', '6', 'Bender', 'Bend at 45 degree angle', '10') ;
+
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('1', '5 ft Structural Tubing', '1', '1') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('2', '5x5 ft Steel Sheet', '2', '2') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('3', 'Stainless Corner Bend', '3', '3') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('4', '10 ft Boiler Tube', '4', '4') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('5', '8 ft Big Pipe', '5', '5') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('6', '8 ft Big Pipe Angled', '5', '6') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('7', '2 ft Small Pipe', '6', '7') ;
+INSERT INTO dbo.PRODUCT(ProdNbr, ProdDesc, RawID, ManufactureID)
+VALUES ('8', '2 ft Small Pipe Angled', '6', '8') ;
+
+INSERT INTO dbo.EMPLOYEE(EmployeeID, EmpFirstName, EmpLastName, BranchNbr)
+VALUES ('1', 'Vaughn', 'Vietti', '1') ;
+INSERT INTO dbo.EMPLOYEE(EmployeeID, EmpFirstName, EmpLastName, BranchNbr)
+VALUES ('2', 'Rod', 'RanRite', '2') ;
+INSERT INTO dbo.EMPLOYEE(EmployeeID, EmpFirstName, EmpLastName, BranchNbr)
+VALUES ('3', 'Bob', 'Barville', '3') ;
+INSERT INTO dbo.EMPLOYEE(EmployeeID, EmpFirstName, EmpLastName, BranchNbr)
+VALUES ('4', 'Mike', 'Verwijst', '1') ;
+
+INSERT INTO dbo.BRANCH_LOCATION(BranchNbr, BranchName, BranchGM_EmployeeID)
+VALUES ('1', 'Chicago', '1') ;
+INSERT INTO dbo.BRANCH_LOCATION(BranchNbr, BranchName, BranchGM_EmployeeID)
+VALUES ('2', 'Wisconsin', '2') ;
+INSERT INTO dbo.BRANCH_LOCATION(BranchNbr, BranchName, BranchGM_EmployeeID)
+VALUES ('3', 'Minnesota', '3') ;
+
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('11', '1', '1', '20', '50', '10') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('12', '2', '1', '10', '20', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('13', '3', '1', '10', '20', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('21', '1', '2', '50', '100', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('22', '2', '2', '25', '40', '5') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('23', '3', '2', '25', '40', '5') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('31', '1', '3', '10', '10', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('32', '2', '3', '10', '5', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('33', '3', '3', '10', '5', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('41', '1', '4', '10', '10', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('42', '2', '4', '10', '5', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('43', '3', '4', '10', '5', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('51', '1', '5', '50', '20', '20') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('52', '2', '5', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('53', '3', '5', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('61', '1', '6', '20', '10', '10') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('62', '2', '6', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('63', '3', '6', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('71', '1', '7', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('72', '2', '7', '100', '200', '50') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('73', '3', '7', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('81', '1', '8', '0', '0', '0') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('82', '2', '8', '60', '40', '10') ;
+INSERT INTO dbo.BRANCH_INVENTORY(InventoryID, BranchNbr, ProdNbr, QtyAvailable, QtyOnOrder, QtyReserved)
+VALUES ('83', '3', '8', '0', '0', '0') ;
+
+INSERT INTO dbo.TRANSFER(TransferID, FromBranch, ToBranch, ProdNbr, QtyTransferred)
+VALUES ('1', '1', '2', '1', '15') ;
+INSERT INTO dbo.TRANSFER(TransferID, FromBranch, ToBranch, ProdNbr, QtyTransferred)
+VALUES ('2', '1', '3', '4', '5') ;
+INSERT INTO dbo.TRANSFER(TransferID, FromBranch, ToBranch, ProdNbr, QtyTransferred)
+VALUES ('3', '2', '1', '8', '25') ;
+INSERT INTO dbo.TRANSFER(TransferID, FromBranch, ToBranch, ProdNbr, QtyTransferred)
+VALUES ('4', '2', '3', '8', '15') ;
+
+INSERT INTO dbo.SPECIAL_INVENTORY(SpecialInvID, CustNbr, ProdNbr)
+VALUES ('1', '1', '5') ;
+INSERT INTO dbo.SPECIAL_INVENTORY(SpecialInvID, CustNbr, ProdNbr)
+VALUES ('2', '2', '6') ;
+INSERT INTO dbo.SPECIAL_INVENTORY(SpecialInvID, CustNbr, ProdNbr)
+VALUES ('3', '3', '7') ;
+INSERT INTO dbo.SPECIAL_INVENTORY(SpecialInvID, CustNbr, ProdNbr)
+VALUES ('4', '3', '8') ;
+
+
+## – Database Queries
+
+## Simple Queries
+
+# View current Inventory at the Branch Level (For a specific Branch)
+SELECT *
+FROM BRANCH_INVENTORY
+WHERE BranchNbr = 1 
+
+# Identify which products have low inventory and need to be re-ordered
+SELECT *
+FROM BRANCH_INVENTORY
+WHERE QtyAvailable < 10
+AND BranchNbr = 1
+
+# Identify which products have been over-allocated in error
+SELECT * 
+FROM BRANCH_INVENTORY
+WHERE QtyReserved > QtyAvailable
+
+# Identify which products are being transferred from a specific branch 
+SELECT * 
+FROM [TRANSFER] 
+WHERE FromBranch = 1
+
+# Identify which products are unique to a customer (Special Inventory)
+SELECT * 
+FROM SPECIAL_INVENTORY
+ 
+# Identify which products use the same Raw Material 
+SELECT ProdNbr, ProdDesc, RawID
+FROM PRODUCT
+WHERE RawID = 5
+OR RawID = 6
+ 
+# Identify the highest cost Raw Material to focus on lowering
+SELECT RawID, MaterialName, MaterialCost
+FROM RAW_MATERIAL
+WHERE MaterialCost = (SELECT MAX(MaterialCost) FROM RAW_MATERIAL)
+ 
+# Identify Prospects to focus on converting to Customers
+SELECT CustNbr, CustName, Type
+FROM CUSTOMER
+WHERE Type = 'Prospect'
+ 
+# Identify how many products are being Cut or Bent
+SELECT COUNT(RawID) as NbrCut
+FROM MANUFACTURE_PROCESS
+WHERE Machine = 'Laser'
+ 
+SELECT COUNT(RawID) as NbrBent
+FROM MANUFACTURE_PROCESS
+WHERE Machine = 'Bender'
+
+
+## Complex Queries
+
+# Determine Vendors or Customers in a specific State
+SELECT a.State, b.VendNbr, b.VendName
+FROM ADDRESSES a
+JOIN VENDOR b on a.AddressID = b.AddressID
+WHERE a.State = 'Illinois'
+ 
+SELECT a.State, b.CustNbr, b.CustName
+FROM ADDRESSES a
+JOIN CUSTOMER b on a.AddressID = b.AddressID
+WHERE a.State = 'Illinois'
+ 
+# Determine which Vendor the Raw Material for a Product came from 
+SELECT a.ProdNbr, a.ProdDesc, a.RawID, b.MaterialName, b.VendNbr, c.VendName
+FROM PRODUCT a
+JOIN RAW_MATERIAL b on a.RawID=b.RawID
+JOIN VENDOR c on b.VendNbr = c.VendNbr
+ 
+# Determine the Total Cost to Manufacture a Product (Raw Material + Manufacturing Cost)
+SELECT a.ProdNbr, a.ProdDesc, b.ManufactureCost, c.MaterialCost, (b.ManufactureCost + c.MaterialCost) as TotalCost
+FROM PRODUCT a
+JOIN MANUFACTURE_PROCESS b on a.ManufactureID = b.ManufactureID
+JOIN RAW_MATERIAL c on a.RawID = c.RawID
+WHERE ProdNbr = 4
+               
+# Determine the Inventory level of a Special Product at each Branch
+SELECT a.SpecialInvID, a.ProdNbr, b.BranchNbr, b.QtyAvailable, b.QtyOnOrder, b.QtyReserved
+FROM SPECIAL_INVENTORY a
+JOIN BRANCH_INVENTORY b on a.ProdNbr = b.ProdNbr
+WHERE a.SpecialInvID = 1
+ 
+# Determine who to contact if there is an issue with a specific Raw Material
+SELECT a.RawID, a.MaterialName, b.VendNbr, c.FirstName, c.LastName, c.Phone, c.Email
+FROM RAW_MATERIAL a
+JOIN VENDOR b on a.VendNbr = b.VendNbr
+JOIN CONTACT_INFO c on b.ContactID = c.ContactID
+WHERE a.RawID = 6
+ 
+ 
+## Data Warehouse Creation
+
+# BranchDimension
+SELECT a.BranchNbr, a.BranchName, (b.EmpFirstName + ' ' + b.EmpLastName) as BranchGMName
+INTO BranchDimension
+FROM BRANCH_LOCATION a
+Left Join EMPLOYEE b on a.BranchGM_EmployeeID = b.EmployeeID
+ 
+# VendorDimension
+SELECT a.VendNbr, a.VendName, a.Status as VendStatus, (b.FirstName + b.LastName) as VendContactName, b.Phone as VendContactPhone, b.Email as VendContactEmail, (c.StreetAddress + ', ' + c.City + ', '+ c.State) as VendAddress
+INTO VendorDimension
+FROM VENDOR a
+Left Join CONTACT_INFO b on a.ContactID = b.ContactID
+Left Join ADDRESSES c on a.AddressID = c.AddressID
+ 
+# CustomerDimension
+SELECT a.CustNbr, a.CustName, a.Type as CustType, 
+(b.FirstName + ' '+ b.LastName) as CustContactName, b.Phone as CustContactPhone, b.Email as CustContactEmail, (c.StreetAddress + ', ' + c.City + ', '+ c.State) as CustAddress, d.ProdNbr as SpecialProdNbr
+INTO CustomerDimension
+FROM CUSTOMER a
+Left Join CONTACT_INFO b on a.ContactID = b.ContactID
+Left Join ADDRESSES c on a.AddressID = c.AddressID
+Left Join SPECIAL_INVENTORY d on a.CustNbr = d.CustNbr 
+
+#ProductDimension
+SELECT a.ProdNbr, a.ProdDesc, b.MaterialName as RawMaterial, b.MaterialCost,
+c.ManufactureCost, c.Process, c.Machine
+INTO ProductDimension
+FROM PRODUCT a
+Left Join RAW_MATERIAL b on a.RawID = b.RawID
+Left Join MANUFACTURE_PROCESS c on a.ManufactureID = c.ManufactureID
+
+#DateDimension
+CREATE TABLE DateDimension (
+InvDate DATE NOT NULL PRIMARY KEY,
+"DayOfWeek" VARCHAR (10) NOT NULL,
+"Month" VARCHAR (20) NOT NULL,
+"Year" Integer NOT NULL);
+INSERT INTO dbo.DateDimension (InvDate, DayOfWeek, Month, Year)
+VALUES ('2017-11-01', 'Wednesday', 'November', '2017');
+INSERT INTO dbo.DateDimension (InvDate, DayOfWeek, Month, Year)
+VALUES ('2017-11-02', 'Thursday', 'November', '2017');
+INSERT INTO dbo.DateDimension (InvDate, DayOfWeek, Month, Year)
+VALUES ('2017-11-03', 'Friday', 'November', '2017');
+ 
+# Inventory Fact Table
+SELECT b.BranchNbr, f.InvDate, c.ProdNbr, d.VendNbr, e.CustNbr, 
+a.QtyAvailable, a.QtyReserved, a.QtyOnOrder, 
+(a.QtyAvailable * (c.MaterialCost*c.ManufactureCost)) as Inv_Value_Cost
+INTO InventoryFactTable
+FROM BRANCH_INVENTORY a
+Left Join BranchDimension b on a.BranchNbr = b.BranchNbr
+Left Join ProductDimension c on a.ProdNbr = c.ProdNbr
+Left join VendorDimension d on c.VendNbr = d.VendNbr
+Left Join CustomerDimension e on a.ProdNbr = e.SpecialProdNbr
+Left Join DateDimension f on a.InvDate = f.InvDate
+ 
+
+## Data Warehouse Queries
+
+# What is the Total Inventory Value at all Branches?
+SELECT b.BranchName, sum(a.Inv_Value_Cost) as TotInv_Value
+FROM InventoryFactTable a
+	Left Join BranchDimension b on a.BranchNbr = b.BranchNbr
+GROUP BY b.BranchName
+ 
+# How much Raw Material is currently on Order from each Vendor?
+SELECT b.VendName, c.RawMaterial, sum(a.QtyOnOrder) as Total_QtyOnOrder
+FROM InventoryFactTable a
+	Left Join VendorDimension b on a.VendNbr = b.VendNbr
+	Left Join ProductDimension c on a.ProdNbr = c.ProdNbr
+WHERE a.QtyOnOrder > 0
+GROUP BY b.VendName, c.RawMaterial
+ORDER BY b.VendName, c.RawMaterial
+ 
+# How much Inventory is currently available for a specific Customer?
+SELECT b.CustName, c.ProdDesc, sum(a.QtyAvailable) as Total_CurrentlyAvailable
+FROM InventoryFactTable a
+	Left Join CustomerDimension b on a.CustNbr = b.CustNbr
+	Left Join ProductDimension c on a.ProdNbr = c.ProdNbr
+WHERE b.SpecialProdNbr IS NOT NULL
+GROUP BY b.CustName, c.ProdDesc
+ORDER BY b.CustName, c.ProdDesc
