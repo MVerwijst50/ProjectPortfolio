@@ -29,5 +29,3 @@ inspect(rules)
 # [8]  {iPHONE,ZUNE}  => {iPAD}   0.375   1.0000000  2.000000 3    
 # [9]  {iPAD,ZUNE}    => {iPHONE} 0.375   1.0000000  2.000000 3    
 # [10] {BluRay,X-BOX} => {TV}     0.375   1.0000000  1.333333 3
-
-<a href="attachments/Freight Analysis Tool.docx" class="image fit"></a>
