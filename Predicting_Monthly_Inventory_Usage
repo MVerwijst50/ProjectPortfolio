@@ -1,0 +1,333 @@
+library(forecast)
+library(hts)
+library(fpp2)
+library(readxl)
+library(xlsx)
+library(data.table)
+library(tsintermittent)
+
+###Update Label for File Naming
+Label <- "Branch1_010"
+
+###Get Data into R
+ImportFile <-  paste(".../ProjectData_CrossTab_" 
+                     , Label,".xlsx", sep="")
+ProjectData <-read_excel(ImportFile, sheet="Sheet1")
+UsageData <- ProjectData
+
+###Remove Period Column
+x <- ncol(UsageData)
+UsageData <- UsageData[,2:x]
+
+###Only select Products with History in at least 1 of last 12 months and total usage of > 10 units
+keep <- (colMeans(UsageData[25:36,]>0) >= 0.0833)
+UsageData_trimmed <- UsageData[, keep, drop = FALSE]
+UsageData <- UsageData_trimmed
+UsageData <- UsageData[, colSums(UsageData) > 10]
+
+###Re-organize column headers for Correct Aggregation needed by hts()
+h1 <- substring(names(UsageData),7)
+h2 <- substring(names(UsageData),0,5)
+names(UsageData) <- paste(h1,h2, sep="_")
+
+###Split data into Train and Test Data Sets
+train <- UsageData[1:36,]
+test <- UsageData[37:41,]
+
+ 
+###Create the Aggregation Structure using hts()
+UsageBTS <- ts(train, frequency = 12, start=c(2016,1), end = c(2018,12))
+usageHTS <- hts(UsageBTS, characters = c(6,6))
+UsageBTS_Test <- ts(test, frequency = 12, start=c(2019,1), end = c(2019,5))
+usageHTS_Test <- hts(UsageBTS, characters = c(6,6))
+
+###Optimal Reconciliation Forecast Method using hts()
+FC_OptRec <- forecast(usageHTS, h=5, algorithms="cg", keep.fitted=TRUE, keep.resid=TRUE, parallel=TRUE, num.cores=4)
+FC_AGG_OptRec <- aggts(FC_OptRec, levels=2:2)
+
+###Random Walk Forecast Method using hts()
+FC_RandomWalk <- forecast(usageHTS, method="bu", fmethod="rw", h=5, keep.fitted=TRUE, keep.resid=TRUE, parallel=TRUE, num.cores=4)
+FC_AGG_RandomWalk <- aggts(FC_RandomWalk, levels=2:2)
+
+##ETS Forecast Method using hts()
+FC_ETS <- forecast(usageHTS, method="bu", fmethod="ets", h=5, keep.fitted=TRUE, keep.resid=TRUE, parallel=TRUE, num.cores=4)
+FC_AGG_ETS <- aggts(FC_ETS, levels=2:2)
+
+#ARIMA Forecast Method using hts()
+FC_ARIMA <- forecast(usageHTS, method="bu", fmethod="arima", h=5, keep.fitted=TRUE, keep.resid=TRUE, parallel=TRUE, num.cores=4)
+FC_AGG_ARIMA <- aggts(FC_ARIMA, levels=2:2)
+
+###Convert Bottom Level hts aggregation to Data Frames
+DF_OptRec_BL <- as.data.frame(aggts(FC_OptRec, levels = 2:2))
+DF_RandomWalk_BL <- as.data.frame(aggts(FC_RandomWalk, levels = 2:2))
+DF_ETS_BL <- as.data.frame(aggts(FC_ETS, levels = 2:2))
+DF_ARIMA_BL <- as.data.frame(aggts(FC_ARIMA, levels = 2:2))
+
+###Convert Data Frames to Tables for proper Exporting to Excel
+DF_OptRec_BL = t(DF_OptRec_BL)
+DF_RandomWalk_BL = t(DF_RandomWalk_BL)
+DF_ETS_BL = t(DF_ETS_BL)
+DF_ARIMA_BL = t(DF_ARIMA_BL)
+
+###Change Column Names for Tables
+colnames(DF_OptRec_BL) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(DF_RandomWalk_BL) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(DF_ETS_BL) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(DF_ARIMA_BL) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+
+###Round Forecast Results to 2 digits
+DF_OptRec_BL <- round(DF_OptRec_BL, digits = 2)
+DF_RandomWalk_BL <- round(DF_RandomWalk_BL, digits = 2)
+DF_ETS_BL <- round(DF_ETS_BL, digits = 2)
+DF_ARIMA_BL <- round(DF_ARIMA_BL, digits = 2)
+
+###Calculate Accuracy of each Forecast Method using hts() on TEST data
+###Determine best performing method as it relates to RMSE (MAPE=Inf because of zero values)
+accuracy(FC_AGG_OptRec,UsageBTS_Test)
+accuracy(FC_AGG_RandomWalk,UsageBTS_Test)
+accuracy(FC_AGG_ETS,UsageBTS_Test)
+accuracy(FC_AGG_ARIMA,UsageBTS_Test)
+
+
+###EXPLORE TRADITIONAL FORECAST METHODS
+
+###Create List of Monthly Seasonality using STL() for all columns
+SeasonalList <- list()
+for(i in 1:ncol(train)){
+  STLdecomp <- stl(UsageBTS[ ,i],s.window="periodic")
+  SeasonalList[[i]] <- STLdecomp$time.series[1:12,1]
+}
+
+###Create List of Forecasts using STLF() for all columns
+STLF_List <- list()
+  for(i in 1:ncol(train)){
+      STLForecast <- stlf(UsageBTS[ ,i],s.window="periodic", h=5)
+      STLF_List[[i]] <- STLForecast$mean
+  }
+
+###Create List of Forecasts using TBATS() for all columns
+TBATS_List <- list()
+for(i in 1:ncol(train)){
+  TBATSForecast <- forecast(tbats(UsageBTS[ ,i], parallel=TRUE, num.cores=4), h=5)
+  TBATS_List[[i]] <- TBATSForecast$mean} 
+
+###Create List of Forecasts using auto.arima() for all columns
+ARIMA_List <- list()
+for(i in 1:ncol(train)){
+  ArimaForecast <- forecast(auto.arima(UsageBTS[ ,i]), h=5)
+  ARIMA_List[[i]] <- ArimaForecast$mean
+}
+
+###Create List of Forecasts using ETS for all columns
+ETS_List <- list()
+for(i in 1:ncol(train)){
+  ETSForecast <- stlf(UsageBTS[ ,i], etsmodel="ZZZ", damped=TRUE, h=5)
+  ETS_List[[i]] <- ETSForecast$mean
+}
+
+###Convert Lists to Dataframes and round values
+SeasonalData <- data.frame(t(sapply(SeasonalList,c)))
+SeasonalData <- round(t(SeasonalData), digits = 2)
+STLF_pred <- data.frame(t(sapply(STLF_List,c)))
+STLF_pred <- round(t(STLF_pred), digits = 2)
+TBATS_pred <- data.frame(t(sapply(TBATS_List,c)))
+TBATS_pred <- round(t(TBATS_pred), digits = 2)
+ARIMA_pred <- data.frame(t(sapply(ARIMA_List,c)))
+ARIMA_pred <- round(t(ARIMA_pred), digits = 2)
+ETS_pred <- data.frame(t(sapply(ETS_List,c)))
+ETS_pred <- round(t(ETS_pred), digits = 2)
+
+###Rename columns and rows
+colnames(SeasonalData) <- colnames(train)
+rownames(SeasonalData) <- c('Jan', 'Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+colnames(STLF_pred) <- colnames(train)
+rownames(STLF_pred) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(TBATS_pred) <- colnames(train)
+rownames(TBATS_pred) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(ARIMA_pred) <- colnames(train)
+rownames(ARIMA_pred) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(ETS_pred) <- colnames(train)
+rownames(ETS_pred) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+
+
+###SEASONALITY ANALYSIS
+
+###Avg Monthly Usage
+MonthlyAvg <- apply(train,2,function(x){(mean(x))})
+MonthlyAvg <- t(MonthlyAvg)
+
+###Bind Avg Monthly Usage to bottom of SeasonalData  
+pred <- rbind(SeasonalData,MonthlyAvg)
+
+###Loop through each column, add each row to the Monthly Average row (13)
+for(i in 1:ncol(pred)){
+  pred[1,i] <- pred[1,i]+ pred[13,i]
+  pred[2,i] <- pred[2,i]+ pred[13,i]
+  pred[3,i] <- pred[3,i]+ pred[13,i]
+  pred[4,i] <- pred[4,i]+ pred[13,i]
+  pred[5,i] <- pred[5,i]+ pred[13,i]
+  pred[6,i] <- pred[6,i]+ pred[13,i]
+  pred[7,i] <- pred[7,i]+ pred[13,i]
+  pred[8,i] <- pred[8,i]+ pred[13,i]
+  pred[9,i] <- pred[9,i]+ pred[13,i]
+  pred[10,i] <- pred[10,i]+ pred[13,i]
+  pred[11,i] <- pred[11,i]+ pred[13,i]
+  pred[12,i] <- pred[12,i]+ pred[13,i]
+  }
+MonthlyAvg_Pred <- round(pred, digits = 2)
+
+Seasonality_Index <- MonthlyAvg_Pred
+for(i in 1:ncol(Seasonality_Index)){
+  Seasonality_Index[1,i] <- Seasonality_Index[1,i] / Seasonality_Index[13,i]
+  Seasonality_Index[2,i] <- Seasonality_Index[2,i] / Seasonality_Index[13,i]
+  Seasonality_Index[3,i] <- Seasonality_Index[3,i] / Seasonality_Index[13,i]
+  Seasonality_Index[4,i] <- Seasonality_Index[4,i] / Seasonality_Index[13,i]
+  Seasonality_Index[5,i] <- Seasonality_Index[5,i] / Seasonality_Index[13,i]
+  Seasonality_Index[6,i] <- Seasonality_Index[6,i] / Seasonality_Index[13,i]
+  Seasonality_Index[7,i] <- Seasonality_Index[7,i] / Seasonality_Index[13,i]
+  Seasonality_Index[8,i] <- Seasonality_Index[8,i] / Seasonality_Index[13,i]
+  Seasonality_Index[9,i] <- Seasonality_Index[9,i] / Seasonality_Index[13,i]
+  Seasonality_Index[10,i] <- Seasonality_Index[10,i] / Seasonality_Index[13,i]
+  Seasonality_Index[11,i] <- Seasonality_Index[11,i] / Seasonality_Index[13,i]
+  Seasonality_Index[12,i] <-Seasonality_Index[12,i] / Seasonality_Index[13,i]
+}
+Seasonality_Index <- round(Seasonality_Index, digits = 4) 
+
+###Calculate Accuracy of each Forecast Method on TEST data
+###Determine best performing method as it relates to RMSE (MAPE=Inf because of zero values)
+MonthlyAvg_Pred <- ts(MonthlyAvg_Pred[1:12,], frequency = 12, start=c(2019,1), end = c(2019,12))
+STLF_Pred <- ts(STLF_pred, frequency = 12, start=c(2019,1), end = c(2019,12))
+TBATS_pred <- ts(TBATS_pred, frequency = 12, start=c(2019,1), end = c(2019,12))
+ARIMA_pred <- ts(ARIMA_pred, frequency = 12, start=c(2019,1), end = c(2019,12))
+ETS_pred <- ts(ETS_pred, frequency = 12, start=c(2019,1), end = c(2019,12))
+
+#hts() methods
+accuracy(FC_AGG_OptRec,UsageBTS_Test)
+accuracy(FC_AGG_RandomWalk,UsageBTS_Test)
+accuracy(FC_AGG_ETS,UsageBTS_Test)
+accuracy(FC_AGG_ARIMA,UsageBTS_Test)
+
+#traditional methods
+accuracy(STLF_Pred, UsageBTS_Test)
+accuracy(TBATS_pred, UsageBTS_Test)
+accuracy(ARIMA_pred, UsageBTS_Test)
+accuracy(ETS_pred, UsageBTS_Test)
+accuracy(MonthlyAvg_Pred, UsageBTS_Test)
+
+###Convert Data Frames to Tables for proper Exporting to Excel
+MonthlyAvg_Pred1 <- t(MonthlyAvg_Pred)
+STLF_pred1 <- t(STLF_Pred)
+TBATS_pred1 <- t(TBATS_pred)
+ARIMA_pred1 <- t(ARIMA_pred)
+ETS_pred1 <- t(ETS_pred)
+
+MonthlyAvg_Pred1 <- MonthlyAvg_Pred1[,1:5]
+STLF_pred1 <- STLF_pred1[,1:5]
+TBATS_pred1 <- TBATS_pred1[,1:5]
+ARIMA_pred1 <- ARIMA_pred1[,1:5]
+ETS_pred1 <- ETS_pred1[,1:5]
+
+colnames(MonthlyAvg_Pred1) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(STLF_pred1) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(TBATS_pred1) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(ARIMA_pred1) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast')
+colnames(ETS_pred1) <- c('Jan_Forecast','Feb_Forecast','Mar_Forecast','Apr_Forecast','May_Forecast') 
+
+###Define File Paths
+Fc_Path <- paste("C:/.../PredictionResults_", Label,".xlsx", sep="")
+Seas_Path <- paste("C:/.../Seasonality_", Label,".xlsx", sep="")
+
+###Export All Forecasts to Separate Sheets in same Excel Workbook
+write.xlsx(DF_OptRec_BL, Fc_Path, sheetName="OptimalReconciliation_hts", append=FALSE)
+write.xlsx(DF_RandomWalk_BL, Fc_Path, sheetName="RandomWalk_hts", append=TRUE)
+write.xlsx(DF_ETS_BL, file=Fc_Path, row.names=TRUE, 
+           sheetName="ETS_hts", append=TRUE)
+write.xlsx(DF_ARIMA_BL, file=Fc_Path, row.names=TRUE, 
+           sheetName="ARIMA_hts", append=TRUE)
+write.xlsx(MonthlyAvg_Pred1, file=Fc_Path, row.names=TRUE, 
+           sheetName="MonthlyAvg_Pred", append=TRUE)
+write.xlsx(STLF_pred1, file=Fc_Path, row.names=TRUE, 
+           sheetName="STLF_Pred", append=TRUE)
+write.xlsx(TBATS_pred1, file=Fc_Path, row.names=TRUE, 
+           sheetName="TBATS_Pred", append=TRUE)
+write.xlsx(ARIMA_pred1, file=Fc_Path, row.names=TRUE, 
+           sheetName="ARIMA_Pred", append=TRUE)
+write.xlsx(ETS_pred1, file=Fc_Path, row.names=TRUE, 
+           sheetName="ETS_Pred", append=TRUE)
+
+###Write the Seasonality Index, actual seasonal values, monthly avg, and prediction to Excel
+write.xlsx(Seasonality_Index, file=Seas_Path, row.names=TRUE, 
+           sheetName="Seasonality_Percentage")
+write.xlsx(SeasonalData, file=Seas_Path, row.names=TRUE, 
+           sheetName="Seasonality_diffMean", append=TRUE)
+write.xlsx(MonthlyAvg, file=Seas_Path, row.names=TRUE, 
+           sheetName="MonthlyAvg", append=TRUE)
+write.xlsx(MonthlyAvg_Pred, file=Seas_Path, row.names=TRUE, 
+           sheetName="MonthlyAvg_Pred", append=TRUE)
+
+
+###Compare Simple Seasonal Method to Incumbent Method
+
+###Get Aggregated QtyOrd Data into R
+ImportFile1 <-  paste("C:/.../ProjectData_CrossTab_" 
+                      , Label,".xlsx", sep="")
+QtyOrd_Aggregate <-read_excel(ImportFile1, sheet="Sheet2")
+y <- ncol(QtyOrd_Aggregate)
+QtyOrd_Aggregate <- QtyOrd_Aggregate[,2:y]
+h3 <- substring(names(QtyOrd_Aggregate),8)
+names(QtyOrd_Aggregate) <- paste(h3)
+#View(QtyOrd_Aggregate)
+
+###Aggregate Actual Usage Data at the Part Level
+UsageTest <- test
+U_BTS <- ts(UsageTest, frequency = 12, start=c(2019,1), end = c(2019,5))
+U_HTS <- hts(U_BTS, characters = c(6,6))
+Usage_Aggregate <- aggts(U_HTS, levels=1:1)
+#View(Usage_Aggregate)
+
+###Aggregate Monthly Avg Prediction at the Part Level
+MA_Pred_Aggregate <- MonthlyAvg_Pred
+MA_BTS <- ts(MA_Pred_Aggregate, frequency = 12, start=c(2019,1), end = c(2019,5))
+MA_HTS <- hts(MA_BTS, characters = c(6,6))
+MA_Pred_Aggregate <- aggts(MA_HTS, levels=1:1)
+#View(MA_Pred_Aggregate)
+
+###Get only matching columns... exclude new parts
+ncol(Usage_Aggregate)
+ncol(QtyOrd_Aggregate)
+ncol(MA_Pred_Aggregate)
+
+column_matches <- intersect(colnames(Usage_Aggregate),colnames(QtyOrd_Aggregate))
+column_matches <- intersect(column_matches,colnames(MA_Pred_Aggregate))
+
+Usage_Aggregate <- Usage_Aggregate[ , column_matches]
+QtyOrd_Aggregate <- QtyOrd_Aggregate[ , column_matches]
+MA_Pred_Aggregate <- MA_Pred_Aggregate[ , column_matches]
+ncol(Usage_Aggregate)
+ncol(QtyOrd_Aggregate)
+ncol(MA_Pred_Aggregate)
+ 
+###Compute RMSE of MonthAvg Prediction and Incumbent method using accuracy()
+MA_Pred_Aggregate <- ts(MA_Pred_Aggregate[1:5,], frequency = 12, start=c(2019,1), end = c(2019,5))
+QtyOrd_Aggregate <- ts(QtyOrd_Aggregate[1:5,], frequency = 12, start=c(2019,1), end = c(2019,5))
+Usage_Aggregate <- ts(Usage_Aggregate[1:5,], frequency = 12, start=c(2019,1), end = c(2019,5))
+
+accuracy(MA_Pred_Aggregate, Usage_Aggregate)
+accuracy(QtyOrd_Aggregate, Usage_Aggregate)
+
+###Sum Columns to get totals by part
+MA_Pred_Aggregate_colsum <- colSums(MA_Pred_Aggregate)
+QtyOrd_Aggregate_colsum <- colSums(QtyOrd_Aggregate)
+Usage_Aggregate_colsum <- colSums(Usage_Aggregate)
+
+###Calculate the difference of Prediction-Usage and Incumbent method-Usage  
+MA_Pred_Aggregate_DIFF <- MA_Pred_Aggregate_colsum - Usage_Aggregate_colsum
+QtyOrd_Aggregate_DIFF <- QtyOrd_Aggregate_colsum - Usage_Aggregate_colsum
+
+###Calculate the total Inventory Impact of Prediction and Incumbent methods
+MA_Pred_Aggregate_InvImpact <- rowSums(t(MA_Pred_Aggregate_DIFF))
+QtyOrd_Aggregate_InvImpact <- rowSums(t(QtyOrd_Aggregate_DIFF))
+MA_Pred_Aggregate_InvImpact
+QtyOrd_Aggregate_InvImpact
+
+
