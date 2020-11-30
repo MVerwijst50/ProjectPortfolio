@@ -1,0 +1,31 @@
+# R Code – Apriori Algorithm
+
+library(arules)
+
+transactions <- read.csv("MidTerm_SampleData.csv")
+transactions <- as(split(as.vector(transactions$Item), as.vector(transactions$Customer)),"transactions")
+inspect(transactions)
+#    items                       transactionID 
+# [1] {iPAD,iPHONE,ZUNE}          Abe Lincoln   
+# [2] {BluRay,TV,X-BOX}           Betty Crocker 
+# [3] {BluRay,TV,X-BOX}           Fred Flinstone
+# [4] {iPAD,iPHONE,TV,X-BOX,ZUNE} Jane Doe      
+# [5] {BluRay,TV}                 John Doe      
+# [6] {BluRay,TV,X-BOX}           John Wayne    
+# [7] {iPAD,iPHONE,ZUNE}          Judge Judy    
+# [8] {iPAD,iPHONE,TV,X-BOX}      Michael Jordan
+
+rules <- apriori(transactions, parameter=list(supp=.375, conf=.80, target="rules"))
+Apriori
+inspect(rules)
+#      lhs               rhs      support confidence lift     count
+# [1]  {ZUNE}         => {iPHONE} 0.375   1.0000000  2.000000 3    
+# [2]  {ZUNE}         => {iPAD}   0.375   1.0000000  2.000000 3    
+# [3]  {BluRay}       => {TV}     0.500   1.0000000  1.333333 4    
+# [4]  {iPHONE}       => {iPAD}   0.500   1.0000000  2.000000 4    
+# [5]  {iPAD}         => {iPHONE} 0.500   1.0000000  2.000000 4    
+# [6]  {X-BOX}        => {TV}     0.625   1.0000000  1.333333 5    
+# [7]  {TV}           => {X-BOX}  0.625   0.8333333  1.333333 5    
+# [8]  {iPHONE,ZUNE}  => {iPAD}   0.375   1.0000000  2.000000 3    
+# [9]  {iPAD,ZUNE}    => {iPHONE} 0.375   1.0000000  2.000000 3    
+# [10] {BluRay,X-BOX} => {TV}     0.375   1.0000000  1.333333 3
