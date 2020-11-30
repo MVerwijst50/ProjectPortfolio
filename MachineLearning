@@ -1,5 +1,9 @@
 # R Code – Apriori Algorithm
 
+# Summary - Use Machine Learning (Market Basket Analysis) to make data-backed recommendations regarding product placement and advertising.
+# Data Concepts - Supervised Machine Learning –  Apriori Algorithm (Market Basket Analysis)
+
+
 library(arules)
 
 transactions <- read.csv("MidTerm_SampleData.csv")
